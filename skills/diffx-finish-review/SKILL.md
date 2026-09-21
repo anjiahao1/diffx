@@ -73,6 +73,8 @@ curl -s -X POST http://localhost:<port>/api/comments/<id>/replies \
 
 The `side` field tells you whether the comment is on an added line (`additions`) or a deleted line (`deletions`).
 
+**Workspace mode (`--multi`):** comments carry a `repo` field and `filePath` is prefixed with it (e.g. `repo: "nuttx"`, `filePath: "nuttx/drivers/serial.c"`), relative to the workspace root. Resolve paths against the workspace root, or strip the `repo/` prefix when working inside that sub-repo.
+
 ### 3. Handle edge cases
 
 - If a comment is ambiguous, reply to ask for clarification rather than guessing.

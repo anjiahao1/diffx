@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { processFile } from '@pierre/diffs'
 import type { FileDiffMetadata } from '@pierre/diffs'
 
@@ -59,15 +59,35 @@ function contentsMatchHunks(partial: FileDiffMetadata, full: FileDiffMetadata): 
  * complete old/new file contents, which enables hunk context expansion.
  * Returns a map from `fileKey(file)` to the upgraded metadata.
  */
-export function useFullDiffs(patch: string | null, files: FileDiffMetadata[], options: { staged: boolean; untracked: boolean }) {
+export function useFullDiffs(patch: string | null, files: FileDiffMetadata[], options: { staged: boolean; untracked: boolean; view?: { commit?: string; repo?: string } }) {
   const [fullFiles, setFullFiles] = useState<Map<string, FileDiffMetadata>>(() => new Map())
   const requested = useRef(new Set<string>())
   const patchRef = useRef(patch)
+  const view = options.view
+  // Responses arrive one file at a time; committing each to state re-renders
+  // the whole virtualized diff. Coalesce: one setState per animation frame,
+  // so a large patch doesn't freeze the main thread on N sequential renders.
+  const pending = useRef(new Map<string, FileDiffMetadata>())
+  const rafId = useRef(0)
+  const flush = useCallback(() => {
+    rafId.current = 0
+    if (pending.current.size === 0) return
+    const batch = pending.current
+    pending.current = new Map()
+    setFullFiles((prev) => {
+      const next = new Map(prev)
+      for (const [k, v] of batch) next.set(k, v)
+      return next
+    })
+  }, [])
 
   useEffect(() => {
     if (patchRef.current !== patch) {
       patchRef.current = patch
       requested.current = new Set()
+      pending.current.clear()
+      if (rafId.current) cancelAnimationFrame(rafId.current)
+      rafId.current = 0
       setFullFiles(new Map())
     }
     if (!patch) return
@@ -91,6 +111,10 @@ export function useFullDiffs(patch: string | null, files: FileDiffMetadata[], op
         staged: String(options.staged),
         untracked: String(options.untracked),
       })
+      // The server re-generates the diff to validate the oids, so it must
+      // see the same view (aggregate vs per-commit) as the patch being shown.
+      if (view?.commit) params.set('commit', view.commit)
+      if (view?.repo) params.set('repo', view.repo)
       fetch(`/api/file-versions?${params}`)
         .then((res) => (res.ok ? res.json() : null))
         .then((data: { old: string; new: string } | null) => {
@@ -101,11 +125,19 @@ export function useFullDiffs(patch: string | null, files: FileDiffMetadata[], op
             newFile: { name: file.name, contents: data.new },
           })
           if (!upgraded || upgraded.isPartial || !contentsMatchHunks(file, upgraded)) return
-          setFullFiles((prev) => new Map(prev).set(key, upgraded))
+          pending.current.set(key, upgraded)
+          if (!rafId.current) rafId.current = requestAnimationFrame(flush)
         })
         .catch(() => {})
     }
-  }, [patch, files, options.staged, options.untracked])
+
+    return () => {
+      if (rafId.current) {
+        cancelAnimationFrame(rafId.current)
+        rafId.current = 0
+      }
+    }
+  }, [patch, files, options.staged, options.untracked, view?.commit, view?.repo, flush])
 
   return fullFiles
 }

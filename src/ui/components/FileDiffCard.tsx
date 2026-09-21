@@ -1,4 +1,4 @@
-import { useState, memo } from 'react'
+import { useState, useRef, memo } from 'react'
 import { FileDiff } from '@pierre/diffs/react'
 import type { DiffLineAnnotation, FileDiffMetadata, AnnotationSide } from '@pierre/diffs'
 import type { ReviewComment } from '../../types'
@@ -8,6 +8,25 @@ import { CommentBubble } from './CommentBubble'
 interface PendingComment {
   side: AnnotationSide
   lineNumber: number
+  columnStart?: number
+  columnEnd?: number
+}
+
+// Column anchor: when the reviewer selected a stretch of text before clicking
+// +, locate it inside this line's content (0-based character offsets).
+function captureColumn(lineContent: string): { columnStart: number; columnEnd: number } | null {
+  const sel = window.getSelection()
+  if (!sel || sel.isCollapsed) return null
+  const text = sel.toString().trim()
+  if (!text) return null
+  // Multi-line or whitespace-variant selections don't match the raw line
+  // content; fall back to a plain line comment.
+  const exact = lineContent.indexOf(text)
+  if (exact !== -1) return { columnStart: exact, columnEnd: exact + text.length }
+  const compact = lineContent.replace(/\s+/g, ' ')
+  const idx = compact.indexOf(text.replace(/\s+/g, ' ').trim())
+  if (idx !== -1) return { columnStart: idx, columnEnd: idx + text.length }
+  return null
 }
 
 interface FileDiffCardProps {
@@ -20,8 +39,10 @@ interface FileDiffCardProps {
   softWrap: boolean
   viewed: boolean
   onViewedChange: (filePath: string, viewed: boolean) => void
-  onAddComment: (filePath: string, side: AnnotationSide, lineNumber: number, lineContent: string, body: string) => void
+  onAddComment: (filePath: string, side: AnnotationSide, lineNumber: number, lineContent: string, body: string, column?: { columnStart: number; columnEnd: number }) => void
   onDeleteComment: (id: string) => void
+  onResolveComment: (id: string) => void
+  onReply?: (commentId: string, body: string) => void
 }
 
 export const FileDiffCard = memo(function FileDiffCard({
@@ -36,6 +57,8 @@ export const FileDiffCard = memo(function FileDiffCard({
   onViewedChange,
   onAddComment,
   onDeleteComment,
+  onResolveComment,
+  onReply,
 }: FileDiffCardProps) {
   const [pending, setPending] = useState<PendingComment | null>(null)
 
@@ -116,9 +139,23 @@ export const FileDiffCard = memo(function FileDiffCard({
               if ('_pending' in annotation.metadata) {
                 return (
                   <CommentForm
+                    quote={
+                      typeof pending!.columnStart === 'number' && typeof pending!.columnEnd === 'number'
+                        ? getLineContent(pending!.side, pending!.lineNumber).slice(pending!.columnStart, pending!.columnEnd)
+                        : undefined
+                    }
                     onSubmit={(body) => {
                       const lineContent = getLineContent(pending!.side, pending!.lineNumber)
-                      onAddComment(filePath, pending!.side, pending!.lineNumber, lineContent, body)
+                      onAddComment(
+                        filePath,
+                        pending!.side,
+                        pending!.lineNumber,
+                        lineContent,
+                        body,
+                        typeof pending!.columnStart === 'number' && typeof pending!.columnEnd === 'number'
+                          ? { columnStart: pending!.columnStart, columnEnd: pending!.columnEnd }
+                          : undefined,
+                      )
                       setPending(null)
                     }}
                     onCancel={() => setPending(null)}
@@ -129,6 +166,8 @@ export const FileDiffCard = memo(function FileDiffCard({
                 <CommentBubble
                   comment={annotation.metadata as ReviewComment}
                   onDelete={onDeleteComment}
+                  onResolve={onResolveComment}
+                  onReply={onReply}
                 />
               )
             }}
@@ -138,7 +177,14 @@ export const FileDiffCard = memo(function FileDiffCard({
                 onClick={() => {
                   const line = getHoveredLine()
                   if (line) {
-                    setPending({ side: line.side, lineNumber: line.lineNumber })
+                    // Capture the reviewer's text selection as a column
+                    // anchor when it matches this line's content.
+                    const column = captureColumn(getLineContent(line.side, line.lineNumber))
+                    if (column) {
+                      setPending({ side: line.side, lineNumber: line.lineNumber, columnStart: column.columnStart, columnEnd: column.columnEnd })
+                    } else {
+                      setPending({ side: line.side, lineNumber: line.lineNumber })
+                    }
                   }
                 }}
               >

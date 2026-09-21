@@ -15,7 +15,7 @@ export function useComments() {
   const { data: comments = [] } = useQuery({ queryKey: COMMENTS_KEY, queryFn: fetchComments, refetchInterval: 3000 })
 
   const addMutation = useMutation({
-    mutationFn: async (params: { filePath: string; side: 'deletions' | 'additions'; lineNumber: number; lineContent: string; body: string }) => {
+    mutationFn: async (params: { filePath: string; side: 'deletions' | 'additions'; lineNumber: number; lineContent: string; body: string; repo?: string; commitSha?: string; fileOid?: string; columnStart?: number; columnEnd?: number }) => {
       const res = await fetch('/api/comments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -54,9 +54,32 @@ export function useComments() {
     },
   })
 
+  const replyMutation = useMutation({
+    mutationFn: async ({ commentId, body }: { commentId: string; body: string }) => {
+      const res = await fetch(`/api/comments/${commentId}/replies`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ body, author: 'user' }),
+      })
+      return res.json() as Promise<ReviewComment>
+    },
+    onSuccess: (updated) => {
+      queryClient.setQueryData<ReviewComment[]>(COMMENTS_KEY, (prev = []) =>
+        prev.map((c) => (c.id === updated.id ? updated : c)),
+      )
+    },
+  })
+
   const addComment = useCallback(
-    (filePath: string, side: 'deletions' | 'additions', lineNumber: number, lineContent: string, body: string) => {
-      addMutation.mutate({ filePath, side, lineNumber, lineContent, body })
+    (
+      filePath: string,
+      side: 'deletions' | 'additions',
+      lineNumber: number,
+      lineContent: string,
+      body: string,
+      ctx?: { repo?: string; commitSha?: string; fileOid?: string; columnStart?: number; columnEnd?: number },
+    ) => {
+      addMutation.mutate({ filePath, side, lineNumber, lineContent, body, ...ctx })
     },
     [addMutation],
   )
@@ -66,6 +89,13 @@ export function useComments() {
       removeMutation.mutate(id)
     },
     [removeMutation],
+  )
+
+  const addReply = useCallback(
+    (commentId: string, body: string) => {
+      replyMutation.mutate({ commentId, body })
+    },
+    [replyMutation],
   )
 
   const editComment = useCallback(
@@ -82,8 +112,16 @@ export function useComments() {
     [editMutation],
   )
 
-  const formatAllComments = useCallback((): string => {
-    if (comments.length === 0) return ''
+  const formatAllComments = useCallback((aiNote: string): string => {
+    const note = aiNote.trim()
+    if (comments.length === 0 && !note) return ''
+
+    const lines: string[] = []
+    if (note) {
+      lines.push(`<ai-instructions>${note}</ai-instructions>`)
+      lines.push('')
+    }
+    lines.push('<code-review-comments>')
 
     const grouped = new Map<string, ReviewComment[]>()
     for (const comment of comments) {
@@ -91,14 +129,22 @@ export function useComments() {
       list.push(comment)
       grouped.set(comment.filePath, list)
     }
-
-    const lines: string[] = ['<code-review-comments>']
     for (const [filePath, fileComments] of grouped) {
-      lines.push(`<file path="${filePath}">`)
+      // Commit-anchored comments carry their commit so the agent knows which
+      // commit to amend.
+      const commit = fileComments.find((c) => c.commitSha)
+      const commitAttr = commit ? ` commit="${commit.repo ? `${commit.repo}@` : ''}${commit.commitSha!.slice(0, 7)}"` : ''
+      lines.push(`<file path="${filePath}"${commitAttr}>`)
       for (const comment of fileComments) {
-        lines.push(`<comment line="${comment.lineNumber}">`)
+        const hasColumn = typeof comment.columnStart === 'number' && typeof comment.columnEnd === 'number'
+        const columnAttr = hasColumn ? ` column="${comment.columnStart}-${comment.columnEnd}"` : ''
+        lines.push(`<comment line="${comment.lineNumber}"${columnAttr}>`)
+        // A column-anchored comment quotes the selected stretch of the line.
+        const code = hasColumn
+          ? comment.lineContent.slice(comment.columnStart, comment.columnEnd)
+          : comment.lineContent
         const prefix = comment.side === 'additions' ? '+' : '-'
-        lines.push(`<code>${prefix} ${comment.lineContent}</code>`)
+        lines.push(`<code>${prefix} ${code}</code>`)
         lines.push(comment.body)
         lines.push('</comment>')
       }
@@ -122,8 +168,8 @@ export function useComments() {
     [comments],
   )
 
-  const copyAllComments = useCallback(async () => {
-    const text = formatAllComments()
+  const copyAllComments = useCallback(async (aiNote: string) => {
+    const text = formatAllComments(aiNote)
     await navigator.clipboard.writeText(text)
   }, [formatAllComments])
 
@@ -131,6 +177,7 @@ export function useComments() {
     comments,
     addComment,
     removeComment,
+    addReply,
     editComment,
     resolveComment,
     getAnnotationsForFile,

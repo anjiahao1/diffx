@@ -3,9 +3,11 @@ import { useState, useRef, useEffect } from 'react'
 interface CommentFormProps {
   onSubmit: (body: string) => void
   onCancel: () => void
+  // Text the comment anchors to (selected in the line); shown as a quote.
+  quote?: string
 }
 
-export function CommentForm({ onSubmit, onCancel }: CommentFormProps) {
+export function CommentForm({ onSubmit, onCancel, quote }: CommentFormProps) {
   const [body, setBody] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -32,6 +34,7 @@ export function CommentForm({ onSubmit, onCancel }: CommentFormProps) {
 
   return (
     <div className="comment-form">
+      {quote && <div className="comment-form-quote">{quote}</div>}
       <textarea
         ref={textareaRef}
         value={body}

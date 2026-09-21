@@ -391,6 +391,60 @@ body {
     scroll-margin-top: 16px;
 }
 
+/* Commit-message header in the per-commit view */
+.commit-message-card {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin: 24px 24px 0;
+    padding: 10px 14px;
+    background: var(--bg-secondary);
+}
+
+.commit-message-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.commit-message-icon {
+    flex: none;
+    opacity: 0.6;
+}
+
+.commit-message-subject {
+    flex: 1;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.commit-message-body {
+    margin: 8px 0 0;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.commit-message-input {
+    margin-top: 8px;
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+}
+
+.commit-message-input textarea {
+    flex: 1;
+}
+
+.commit-message-comments {
+    margin-top: 10px;
+    border-top: 1px solid var(--border);
+    padding-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
 .file-diff-viewed {
     opacity: 0.6;
 }
@@ -475,6 +529,29 @@ body {
     border-radius: 6px;
 }
 
+.comment-form-quote {
+    border-left: 3px solid var(--success);
+    background: var(--bg-secondary);
+    padding: 4px 8px;
+    margin-bottom: 8px;
+    font-family: monospace;
+    font-size: 12px;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    color: var(--text-secondary);
+}
+
+.comment-bubble-quote {
+    border-left: 3px solid var(--success);
+    background: var(--bg-secondary);
+    padding: 4px 8px;
+    margin-bottom: 8px;
+    font-family: monospace;
+    font-size: 12px;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
 .comment-form textarea {
     width: 100%;
     min-height: 80px;
@@ -539,34 +616,41 @@ body {
     color: var(--text);
 }
 
-.comment-bubble-delete {
-    flex-shrink: 0;
+.comment-bubble-actions {
     display: flex;
     align-items: center;
-    justify-content: center;
-    width: 20px;
-    height: 20px;
-    border: none;
+    gap: 4px;
+    margin-top: 8px;
+}
+
+.comment-action {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border: 1px solid var(--border);
     background: transparent;
     color: var(--text-secondary);
-    font-size: 14px;
+    font-size: 11px;
+    line-height: 1.6;
     cursor: pointer;
     border-radius: 4px;
-    opacity: 0;
-    transition: opacity 0.1s;
+    transition: background 0.1s, color 0.1s, border-color 0.1s;
 }
 
-.comment-bubble:hover .comment-bubble-delete {
-    opacity: 1;
+.comment-action:hover {
+    background: var(--border);
+    color: var(--text);
 }
 
-.comment-bubble-delete:hover {
+.comment-action-close:hover {
     background: #ffebe9;
+    border-color: var(--danger);
     color: var(--danger);
 }
 
 @media (prefers-color-scheme: dark) {
-    .comment-bubble-delete:hover {
+    .comment-action-close:hover {
         background: #2d1214;
     }
 }
@@ -1050,4 +1134,251 @@ body {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.ct-diff-btn {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px;
+    border: none;
+    background: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+
+.ct-diff-btn:hover {
+    color: var(--accent, #58a6ff);
+    background: var(--bg-hover, rgba(128, 128, 128, 0.15));
+}
+
+/* Commit list (per-commit review) */
+
+.commit-list {
+    border-bottom: 1px solid var(--border, rgba(128, 128, 128, 0.25));
+    max-height: 40%;
+    overflow-y: auto;
+    flex-shrink: 0;
+}
+
+.commit-list-header {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+    padding: 8px 12px 4px;
+}
+
+.commit-group-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text);
+    padding: 4px 12px 2px;
+}
+
+.commit-group-branch {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-weight: 400;
+    color: var(--text-secondary);
+}
+
+.commit-group-list {
+    list-style: none;
+    margin: 0;
+    padding: 0 4px 4px;
+}
+
+.commit-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    padding: 3px 8px;
+    border: none;
+    background: none;
+    color: var(--text);
+    font-size: 12px;
+    text-align: left;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+.commit-item:hover {
+    background: var(--bg-hover, rgba(128, 128, 128, 0.15));
+}
+
+.commit-item-active {
+    background: var(--bg-active, rgba(88, 166, 255, 0.2));
+}
+
+.commit-sha {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 11px;
+    color: var(--accent, #58a6ff);
+    flex-shrink: 0;
+}
+
+.commit-subject {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+}
+
+.commit-date {
+    font-size: 10px;
+    color: var(--text-secondary);
+    flex-shrink: 0;
+}
+
+/* Done Review button */
+
+.ai-note {
+    margin: 8px 12px;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg-secondary);
+}
+
+.ai-note-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+}
+
+.ai-note-header .btn {
+    margin-left: auto;
+    padding: 1px 8px;
+}
+
+.ai-note-saved {
+    font-size: 11px;
+    color: var(--success);
+}
+
+.ai-note-input {
+    width: 100%;
+    box-sizing: border-box;
+    resize: vertical;
+    font-size: 12px;
+    padding: 6px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg);
+    color: var(--text);
+}
+
+.review-done-btn {
+    margin: 8px 12px;
+    align-self: stretch;
+}
+
+.review-done-active {
+    color: #3fb950;
+    border-color: #3fb950;
+}
+
+/* Commit-view banner in the toolbar */
+
+.toolbar-viewing {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: var(--bg-hover, rgba(88, 166, 255, 0.15));
+    color: var(--accent, #58a6ff);
+}
+
+.toolbar-back {
+    margin-left: 2px;
+}
+
+/* "Diff since comment" modal */
+
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+}
+
+.modal {
+    background: var(--bg, #fff);
+    border: 1px solid var(--border, rgba(128, 128, 128, 0.35));
+    border-radius: 8px;
+    width: min(860px, 90vw);
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border, rgba(128, 128, 128, 0.25));
+}
+
+.modal-title {
+    font-size: 12px;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.modal-patch {
+    margin: 0;
+    padding: 12px;
+    overflow: auto;
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    white-space: pre;
+}
+
+/* Reply input inside a comment bubble */
+
+.comment-reply-input {
+    display: flex;
+    align-items: flex-end;
+    gap: 6px;
+    margin-top: 6px;
+}
+
+.comment-reply-input textarea {
+    flex: 1;
+    resize: vertical;
+    min-height: 36px;
+    padding: 6px 8px;
+    font-size: 12px;
+    font-family: inherit;
+    color: var(--text);
+    background: var(--bg-hover, rgba(128, 128, 128, 0.08));
+    border: 1px solid var(--border, rgba(128, 128, 128, 0.35));
+    border-radius: 6px;
+    outline: none;
+}
+
+.comment-reply-input textarea:focus {
+    border-color: var(--accent, #58a6ff);
 }

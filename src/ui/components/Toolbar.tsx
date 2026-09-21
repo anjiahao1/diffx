@@ -1,10 +1,14 @@
 import { useState, useRef, useEffect } from 'react'
-import { GitBranch, Settings } from 'lucide-react'
-import type { DiffOptions } from '../hooks/useDiff'
+import { GitBranch, Layers, Settings, Undo2 } from 'lucide-react'
+import type { DiffOptions, RepoMeta } from '../hooks/useDiff'
+import type { SelectedCommit } from './CommitList'
 
 interface ToolbarProps {
   repoName: string
   branch: string
+  repos?: RepoMeta[]
+  viewing?: SelectedCommit | null
+  onExitCommitView: () => void
   fileCount: number
   additions: number
   deletions: number
@@ -26,6 +30,9 @@ interface ToolbarProps {
 export function Toolbar({
   repoName,
   branch,
+  repos,
+  viewing,
+  onExitCommitView,
   fileCount,
   additions,
   deletions,
@@ -69,10 +76,27 @@ export function Toolbar({
     <div className="toolbar">
       <div className="toolbar-left">
         <h1 className="toolbar-title">{repoName}</h1>
-        {branch && (
-          <span className="toolbar-branch">
-            <GitBranch size={12} />
-            {branch}
+        {repos ? (
+          <span className="toolbar-branch" title={repos.map((r) => `${r.relPath} (${r.branch})`).join('\n')}>
+            <Layers size={12} />
+            {repos.length} repo{repos.length !== 1 ? 's' : ''} changed
+          </span>
+        ) : (
+          branch && (
+            <span className="toolbar-branch">
+              <GitBranch size={12} />
+              {branch}
+            </span>
+          )
+        )}
+        {viewing && (
+          <span className="toolbar-viewing">
+            viewing {viewing.repo ? `${viewing.repo}@` : ''}
+            {viewing.sha.slice(0, 7)}
+            <button className="btn btn-sm toolbar-back" onClick={onExitCommitView} title="Back to all changes">
+              <Undo2 size={12} />
+              All changes
+            </button>
           </span>
         )}
         <span className="toolbar-stat">
@@ -106,29 +130,29 @@ export function Toolbar({
           </button>
           {settingsOpen && (
             <div className="settings-menu">
-              {!customMode && (
-                <>
-                  <label className="settings-item">
-                    <input
-                      type="checkbox"
-                      checked={diffOptions.staged}
-                      onChange={(e) =>
-                        onDiffOptionsChange({ ...diffOptions, staged: e.target.checked })
-                      }
-                    />
-                    Show staged
-                  </label>
-                  <label className="settings-item">
-                    <input
-                      type="checkbox"
-                      checked={diffOptions.untracked}
-                      onChange={(e) =>
-                        onDiffOptionsChange({ ...diffOptions, untracked: e.target.checked })
-                      }
-                    />
-                    Show untracked
-                  </label>
-                </>
+              {!customMode && !repos && (
+                <label className="settings-item">
+                  <input
+                    type="checkbox"
+                    checked={diffOptions.staged}
+                    onChange={(e) =>
+                      onDiffOptionsChange({ ...diffOptions, staged: e.target.checked })
+                    }
+                  />
+                  Show staged
+                </label>
+              )}
+              {!customMode && !viewing && (
+                <label className="settings-item">
+                  <input
+                    type="checkbox"
+                    checked={diffOptions.untracked}
+                    onChange={(e) =>
+                      onDiffOptionsChange({ ...diffOptions, untracked: e.target.checked })
+                    }
+                  />
+                  Show untracked
+                </label>
               )}
               <label className="settings-item">
                 <input

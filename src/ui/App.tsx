@@ -5,14 +5,21 @@ import { Virtualizer } from '@pierre/diffs/react'
 import type { FileDiffMetadata } from '@pierre/diffs'
 import type { ReviewComment } from '../types'
 import { useDiff } from './hooks/useDiff'
+import type { DiffView } from './hooks/useDiff'
 import { useComments } from './hooks/useComments'
 import { useSettings } from './hooks/useSettings'
 import { useViewed } from './hooks/useViewed'
+import { useCommits } from './hooks/useCommits'
 import { useFullDiffs, fileKey } from './hooks/useFullDiffs'
 import { Toolbar } from './components/Toolbar'
 import { DiffViewer } from './components/DiffViewer'
 import { FileTree } from './components/FileTree'
+import { CommitList } from './components/CommitList'
+import type { SelectedCommit } from './components/CommitList'
 import { CommentTracker } from './components/CommentTracker'
+import { CommitMessageCard, COMMIT_MESSAGE } from './components/CommitMessageCard'
+import { AiNote } from './components/AiNote'
+import { ReviewDoneButton } from './components/ReviewDoneButton'
 import { SidebarStorage } from './sidebarStorage'
 
 function useWindowSize({ factor }: { factor: number }) {
@@ -31,15 +38,42 @@ function useWindowSize({ factor }: { factor: number }) {
 
 export function App() {
   const { settings, loaded, updateSettings } = useSettings()
-  const { patch, repoName, branch, customMode, binaryFiles, tabSizeMap, untrackedFiles, loading, error } = useDiff({
-    staged: settings.staged,
-    untracked: settings.untracked,
-  })
-  const { comments, addComment, removeComment, copyAllComments } =
+  const [selectedCommit, setSelectedCommit] = useState<SelectedCommit | null>(null)
+  // Per-commit view (Gerrit-style): the diff switches to that commit's patch.
+  const view: DiffView | undefined = selectedCommit
+    ? { commit: selectedCommit.sha, repo: selectedCommit.repo }
+    : undefined
+  const { patch, repoName, branch, customMode, binaryFiles, tabSizeMap, untrackedFiles, repos, commitMessage, loading, error } = useDiff(
+    {
+      staged: settings.staged,
+      untracked: settings.untracked,
+    },
+    view,
+  )
+  const { comments, addComment, removeComment, addReply, resolveComment, copyAllComments } =
     useComments()
+  const repoCommits = useCommits()
   const [activeFile, setActiveFile] = useState<string | null>(null)
   const [sidebar, setSidebar] = useState(() => SidebarStorage.load())
   const maxSidebarWidth = Math.max(SidebarStorage.minSize, useWindowSize({ factor: 0.5 }))
+
+  // Note to the reviewing agent: loaded once, saved on demand.
+  const [aiNote, setAiNote] = useState('')
+  const [aiNoteSaved, setAiNoteSaved] = useState(false)
+  useEffect(() => {
+    fetch('/api/ai-note')
+      .then((res) => res.json())
+      .then((d) => setAiNote(d.note ?? ''))
+      .catch(() => {})
+  }, [])
+  const saveAiNote = useCallback(async () => {
+    await fetch('/api/ai-note', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ note: aiNote }),
+    })
+    setAiNoteSaved(true)
+  }, [aiNote])
 
   const handleResize = useCallback((_e: React.SyntheticEvent, data: { size: { width: number } }) => {
     setSidebar((prev) => prev.withSize(data.size.width))
@@ -84,7 +118,7 @@ export function App() {
     }
   }, [patch, binaryFiles])
 
-  const fullFiles = useFullDiffs(patch, files, { staged: settings.staged, untracked: settings.untracked })
+  const fullFiles = useFullDiffs(patch, files, { staged: settings.staged, untracked: settings.untracked, view })
   const displayFiles = useMemo(() => {
     if (fullFiles.size === 0) return files
     return files.map((f) => fullFiles.get(fileKey(f)) ?? f)
@@ -136,6 +170,15 @@ export function App() {
     return map
   }, [comments])
 
+  // Comments on the currently viewed commit's message (anchored to the
+  // synthetic COMMIT_MESSAGE path; other commits' are filtered out).
+  const commitMessageComments = useMemo(() => {
+    if (!selectedCommit) return []
+    return comments.filter(
+      (c) => c.filePath === COMMIT_MESSAGE && c.commitSha === selectedCommit.sha && c.repo === selectedCommit.repo,
+    )
+  }, [comments, selectedCommit])
+
   const handleFileClick = useCallback((filePath: string) => {
     setActiveFile(filePath)
     const el = document.getElementById(`file-${filePath}`)
@@ -148,8 +191,77 @@ export function App() {
     setViewed(filePath, viewed)
   }, [setViewed])
 
+  // Scroll to a comment's position in the main view. The comment bubble only
+  // exists once its file's diff is rendered (virtualized — it may not be
+  // mounted at all), so retry for a few seconds and fall back to the file
+  // card anchor, which is present whenever the file is in the current patch.
+  const scrollToComment = useCallback((commentId: string, fallbackFile: string) => {
+    let tries = 0
+    const tick = () => {
+      const el =
+        document.getElementById(`comment-${commentId}`) ??
+        document.getElementById(`file-${fallbackFile}`)
+      if (el) {
+        el.scrollIntoView({ block: 'center' })
+        return
+      }
+      if (++tries < 300) requestAnimationFrame(tick)
+    }
+    requestAnimationFrame(tick)
+  }, [])
+
+  // Comment list click: when the comment is anchored to a commit we're not
+  // viewing, switch the main view to that commit first; scrolling then picks
+  // the bubble up once its file renders.
+  const jumpToComment = useCallback(
+    (comment: ReviewComment) => {
+      const target: SelectedCommit | null = comment.commitSha
+        ? { repo: comment.repo, sha: comment.commitSha }
+        : null
+      const sameView =
+        !!target === !!selectedCommit &&
+        (!target || (target.repo === selectedCommit!.repo && target.sha === selectedCommit!.sha))
+      if (!sameView) setSelectedCommit(target)
+      scrollToComment(comment.id, comment.filePath)
+    },
+    [selectedCommit, scrollToComment],
+  )
+
+  // Comments made in the per-commit view anchor to that commit and record the
+  // file blob oid at comment time (enables "diff since comment").
+  const handleAddComment = useCallback(
+    (filePath: string, side: 'deletions' | 'additions', lineNumber: number, lineContent: string, body: string, column?: { columnStart: number; columnEnd: number }) => {
+      const file = displayFiles.find((f) => f.name === filePath)
+      addComment(filePath, side, lineNumber, lineContent, body, {
+        repo: selectedCommit?.repo,
+        commitSha: selectedCommit?.sha,
+        fileOid: file?.newObjectId,
+        ...column,
+      })
+    },
+    [addComment, selectedCommit, displayFiles],
+  )
+
+  const handleAddCommitMessageComment = useCallback(
+    (body: string) => {
+      if (!selectedCommit) return
+      addComment(COMMIT_MESSAGE, 'additions', 1, '', body, {
+        repo: selectedCommit.repo,
+        commitSha: selectedCommit.sha,
+      })
+    },
+    [addComment, selectedCommit],
+  )
+
   const sidebarContent = (
     <div className="sidebar-content">
+      {!sidebar.collapsed && (
+        <CommitList
+          repoCommits={repoCommits}
+          selected={selectedCommit}
+          onSelect={setSelectedCommit}
+        />
+      )}
       <FileTree
         files={files}
         activeFile={activeFile}
@@ -160,11 +272,18 @@ export function App() {
         collapsed={sidebar.collapsed}
         onToggleCollapse={handleToggleCollapse}
       />
-      {!sidebar.collapsed && <CommentTracker comments={comments} />}
+      {!sidebar.collapsed && <CommentTracker comments={comments} onJumpToComment={jumpToComment} />}
+      {!sidebar.collapsed && (
+        <AiNote note={aiNote} onChange={(n) => { setAiNote(n); setAiNoteSaved(false) }} onSave={saveAiNote} saved={aiNoteSaved} />
+      )}
+      {!sidebar.collapsed && <ReviewDoneButton />}
     </div>
   )
 
-  if (!loaded || loading) {
+  // First paint only: during view switches keep the previous diff rendered
+  // (useDiff retains the old patch while loading the new one) instead of
+  // unmounting everything into a white "Loading..." screen.
+  if (!loaded || (loading && !patch)) {
     return (
       <div className="loading">
         <p>Loading diff...</p>
@@ -185,6 +304,9 @@ export function App() {
       <Toolbar
         repoName={repoName}
         branch={branch}
+        repos={repos}
+        viewing={selectedCommit}
+        onExitCommitView={() => setSelectedCommit(null)}
         fileCount={files.length}
         additions={diffStats.additions}
         deletions={diffStats.deletions}
@@ -200,7 +322,7 @@ export function App() {
         onDefaultTabSizeChange={(size) => updateSettings({ defaultTabSize: size })}
         onSoftWrapChange={(softWrap) => updateSettings({ softWrap })}
         onBrowserChange={(browser) => updateSettings({ browser })}
-        onCopyComments={copyAllComments}
+        onCopyComments={() => copyAllComments(aiNote)}
       />
       <div className="app-body">
         {sidebar.collapsed ? (
@@ -225,6 +347,16 @@ export function App() {
           </Resizable>
         )}
         <main className="main">
+          {selectedCommit && commitMessage && (
+            <CommitMessageCard
+              message={commitMessage}
+              comments={commitMessageComments}
+              onAddComment={handleAddCommitMessageComment}
+              onDeleteComment={removeComment}
+              onResolveComment={resolveComment}
+              onReply={addReply}
+            />
+          )}
           <Virtualizer className="main-scroll" contentClassName="main-content">
             <DiffViewer
               files={displayFiles}
@@ -236,8 +368,10 @@ export function App() {
               binaryFiles={binaryFileMap}
               onViewedChange={handleViewedChange}
               fileAnnotationsMap={fileAnnotationsMap}
-              onAddComment={addComment}
+              onAddComment={handleAddComment}
               onDeleteComment={removeComment}
+              onResolveComment={resolveComment}
+              onReply={addReply}
             />
           </Virtualizer>
         </main>
