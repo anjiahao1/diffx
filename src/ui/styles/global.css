@@ -419,6 +419,8 @@ body {
 
 .commit-message-body {
     margin: 8px 0 0;
+    max-height: 200px;
+    overflow-y: auto;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
     font-size: 13px;
