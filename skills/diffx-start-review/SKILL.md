@@ -45,18 +45,28 @@ Anything after `--` is passed directly to `git diff`, so any valid git diff argu
 
 ### 2. Watch for review completion
 
-Start a one-shot background watcher so you are notified the moment the user
-finishes reviewing. Run this with the Bash tool (`run_in_background: true`),
-replacing `<port>` with the port diffx reported on startup:
+Start a persistent background watcher so you are notified every time the
+user finishes a review round. Run this with the Bash tool
+(`run_in_background: true`), replacing `<port>` with the port diffx reported
+on startup:
 
 ```bash
-until curl -sf http://localhost:<port>/api/review-status | grep -q '"done":true'; do sleep 3; done
+while true; do
+  # wait until the user clicks "Done Review"
+  until curl -sf http://localhost:<port>/api/review-status | grep -q '"done":true'; do sleep 3; done
+  echo "REVIEW_DONE"
+  # wait until "Done Review" is un-clicked, so the next round can trigger again
+  until curl -sf http://localhost:<port>/api/review-status | grep -q '"done":false'; do sleep 3; done
+done
 ```
 
-When it exits, the user has clicked **Done Review** in the UI. Proceed
-directly to the `/diffx-finish-review` flow (fetch comments via the API,
-apply the requested changes, resolve each comment) without waiting for the
-user to come back and say so.
+Each `REVIEW_DONE` line means the user clicked **Done Review** for that
+round: proceed through the `/diffx-finish-review` flow (fetch comments via
+the API, apply the requested changes, resolve each comment) without waiting
+for the user to come back and say so. After you finish, the watcher keeps
+running — if the user reviews again (clicking Done Review once more), you
+get notified again and repeat the flow. The watcher survives rounds; only
+stop it when the whole review session is over.
 
 ### 3. Tell the user
 
