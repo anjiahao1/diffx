@@ -16,8 +16,8 @@ import { DiffViewer } from './components/DiffViewer'
 import { FileTree } from './components/FileTree'
 import { CommitList } from './components/CommitList'
 import type { SelectedCommit } from './components/CommitList'
+import { COMMIT_MESSAGE, buildCommitMessageFile } from './utils'
 import { CommentTracker } from './components/CommentTracker'
-import { CommitMessageCard, COMMIT_MESSAGE } from './components/CommitMessageCard'
 import { AiNote } from './components/AiNote'
 import { ReviewDoneButton } from './components/ReviewDoneButton'
 import { SidebarStorage } from './sidebarStorage'
@@ -95,6 +95,13 @@ export function App() {
       const parsed = parsePatchFiles(patch)
       const parsedFiles = parsed.flatMap((p) => p.files)
 
+      // Per-commit view: the commit message leads the diff as an added
+      // "file" (COMMIT_MESSAGE), so its lines are commentable like any file.
+      if (selectedCommit && commitMessage) {
+        const msgFile = buildCommitMessageFile(commitMessage)
+        if (msgFile) parsedFiles.unshift(msgFile)
+      }
+
       const existingNames = new Set(parsedFiles.map((f) => f.name))
       for (const bf of binaryFiles) {
         if (!existingNames.has(bf.path)) {
@@ -116,7 +123,7 @@ export function App() {
     } catch {
       return []
     }
-  }, [patch, binaryFiles])
+  }, [patch, binaryFiles, selectedCommit, commitMessage])
 
   const fullFiles = useFullDiffs(patch, files, { staged: settings.staged, untracked: settings.untracked, view })
   const displayFiles = useMemo(() => {
@@ -169,15 +176,6 @@ export function App() {
     }
     return map
   }, [comments])
-
-  // Comments on the currently viewed commit's message (anchored to the
-  // synthetic COMMIT_MESSAGE path; other commits' are filtered out).
-  const commitMessageComments = useMemo(() => {
-    if (!selectedCommit) return []
-    return comments.filter(
-      (c) => c.filePath === COMMIT_MESSAGE && c.commitSha === selectedCommit.sha && c.repo === selectedCommit.repo,
-    )
-  }, [comments, selectedCommit])
 
   const handleFileClick = useCallback((filePath: string) => {
     setActiveFile(filePath)
@@ -240,17 +238,6 @@ export function App() {
       })
     },
     [addComment, selectedCommit, displayFiles],
-  )
-
-  const handleAddCommitMessageComment = useCallback(
-    (body: string) => {
-      if (!selectedCommit) return
-      addComment(COMMIT_MESSAGE, 'additions', 1, '', body, {
-        repo: selectedCommit.repo,
-        commitSha: selectedCommit.sha,
-      })
-    },
-    [addComment, selectedCommit],
   )
 
   const sidebarContent = (
@@ -347,16 +334,6 @@ export function App() {
           </Resizable>
         )}
         <main className="main">
-          {selectedCommit && commitMessage && (
-            <CommitMessageCard
-              message={commitMessage}
-              comments={commitMessageComments}
-              onAddComment={handleAddCommitMessageComment}
-              onDeleteComment={removeComment}
-              onResolveComment={resolveComment}
-              onReply={addReply}
-            />
-          )}
           <Virtualizer className="main-scroll" contentClassName="main-content">
             <DiffViewer
               files={displayFiles}

@@ -7,8 +7,7 @@ import {
   GitCompare,
 } from 'lucide-react'
 import type { ReviewComment } from '../../types'
-import { timeAgo, truncate, fileName } from '../utils'
-import { COMMIT_MESSAGE } from './CommitMessageCard'
+import { timeAgo, truncate, fileName, COMMIT_MESSAGE } from '../utils'
 
 interface CommentTrackerProps {
   comments: ReviewComment[]

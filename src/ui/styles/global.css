@@ -391,62 +391,6 @@ body {
     scroll-margin-top: 16px;
 }
 
-/* Commit-message header in the per-commit view */
-.commit-message-card {
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    margin: 24px 24px 0;
-    padding: 10px 14px;
-    background: var(--bg-secondary);
-}
-
-.commit-message-header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.commit-message-icon {
-    flex: none;
-    opacity: 0.6;
-}
-
-.commit-message-subject {
-    flex: 1;
-    font-weight: 600;
-    overflow-wrap: anywhere;
-}
-
-.commit-message-body {
-    margin: 8px 0 0;
-    max-height: 200px;
-    overflow-y: auto;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-    font-size: 13px;
-    color: var(--text-secondary);
-}
-
-.commit-message-input {
-    margin-top: 8px;
-    display: flex;
-    gap: 8px;
-    align-items: flex-end;
-}
-
-.commit-message-input textarea {
-    flex: 1;
-}
-
-.commit-message-comments {
-    margin-top: 10px;
-    border-top: 1px solid var(--border);
-    padding-top: 10px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
 .file-diff-viewed {
     opacity: 0.6;
 }
