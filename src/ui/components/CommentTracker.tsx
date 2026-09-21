@@ -5,6 +5,8 @@ import {
   Reply,
   Circle,
   GitCompare,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react'
 import type { ReviewComment } from '../../types'
 import { timeAgo, truncate, fileName, COMMIT_MESSAGE } from '../utils'
@@ -67,6 +69,7 @@ async function fetchPatchsetDiff(comment: ReviewComment): Promise<string | null>
 }
 
 export function CommentTracker({ comments, onJumpToComment }: CommentTrackerProps) {
+  const [collapsed, setCollapsed] = useState(false)
   const [diffView, setDiffView] = useState<{ title: string; patch: string } | null>(null)
 
   if (comments.length === 0) return null
@@ -85,7 +88,7 @@ export function CommentTracker({ comments, onJumpToComment }: CommentTrackerProp
 
   return (
     <div className="ct">
-      <div className="ct-header">
+      <div className="ct-header" onClick={() => setCollapsed(!collapsed)}>
         <MessageSquare size={14} />
         <span className="ct-title">Comments</span>
         <span className="ct-counts">
@@ -93,7 +96,10 @@ export function CommentTracker({ comments, onJumpToComment }: CommentTrackerProp
           {repliedCount > 0 && <span className="ct-count ct-count-replied">{repliedCount} replied</span>}
           {resolvedCount > 0 && <span className="ct-count ct-count-resolved">{resolvedCount} resolved</span>}
         </span>
+        {collapsed ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
       </div>
+      {!collapsed && (
+      <>
       <ul className="ct-list">
         {sorted.map((comment) => {
           const status = getCommentStatus(comment)
@@ -147,6 +153,8 @@ export function CommentTracker({ comments, onJumpToComment }: CommentTrackerProp
             <pre className="modal-patch">{diffView.patch || 'No changes since this comment.'}</pre>
           </div>
         </div>
+      )}
+      </>
       )}
     </div>
   )

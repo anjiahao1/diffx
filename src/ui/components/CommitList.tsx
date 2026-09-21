@@ -1,4 +1,4 @@
-import { GitBranch } from 'lucide-react'
+import { GitBranch, MessageSquare } from 'lucide-react'
 import type { RepoCommits } from '../hooks/useCommits'
 import { timeAgo } from '../utils'
 
@@ -11,11 +11,13 @@ interface CommitListProps {
   repoCommits: RepoCommits[]
   selected: SelectedCommit | null
   onSelect: (sel: SelectedCommit) => void
+  // Comment count per commit sha, shown as a badge next to each commit.
+  commentCounts?: ReadonlyMap<string, number>
 }
 
 // Per-commit review: unpushed commits (@{u}..HEAD) grouped by repo. Clicking
 // an entry switches the main view to that commit's diff.
-export function CommitList({ repoCommits, selected, onSelect }: CommitListProps) {
+export function CommitList({ repoCommits, selected, onSelect, commentCounts }: CommitListProps) {
   if (repoCommits.length === 0) return null
   return (
     <div className="commit-list">
@@ -43,6 +45,12 @@ export function CommitList({ repoCommits, selected, onSelect }: CommitListProps)
                   >
                     <span className="commit-sha">{c.sha.slice(0, 7)}</span>
                     <span className="commit-subject">{c.subject}</span>
+                    {commentCounts && (commentCounts.get(c.sha) ?? 0) > 0 && (
+                      <span className="commit-item-count" title="Comments on this commit">
+                        <MessageSquare size={10} />
+                        {commentCounts.get(c.sha)}
+                      </span>
+                    )}
                     <span className="commit-date">{timeAgo(new Date(c.date).getTime())}</span>
                   </button>
                 </li>

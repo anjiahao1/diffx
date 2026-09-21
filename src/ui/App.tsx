@@ -152,17 +152,26 @@ export function App() {
     return map
   }, [binaryFiles])
 
+  // Comments visible in the current view: only the viewed commit's own
+  // comments render on a commit diff (otherwise earlier commits' comments
+  // leak onto later commits), and commit-anchored comments stay off the
+  // aggregate diff entirely (the lines they target may not exist there).
+  const visibleComments = useMemo(() => {
+    if (!view?.commit) return comments.filter((c) => !c.commitSha)
+    return comments.filter((c) => c.commitSha === view.commit && c.repo === view.repo)
+  }, [comments, view?.commit, view?.repo])
+
   const commentCounts = useMemo(() => {
     const counts: Record<string, number> = {}
-    for (const c of comments) {
+    for (const c of visibleComments) {
       counts[c.filePath] = (counts[c.filePath] ?? 0) + 1
     }
     return counts
-  }, [comments])
+  }, [visibleComments])
 
   const fileAnnotationsMap = useMemo(() => {
     const map = new Map<string, { side: ReviewComment['side']; lineNumber: number; metadata: ReviewComment }[]>()
-    for (const c of comments) {
+    for (const c of visibleComments) {
       let list = map.get(c.filePath)
       if (!list) {
         list = []
@@ -175,6 +184,16 @@ export function App() {
       })
     }
     return map
+  }, [visibleComments])
+
+  // Comment count per commit (sidebar commit list badge), across all comments.
+  const commitCommentCounts = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const c of comments) {
+      if (!c.commitSha) continue
+      counts.set(c.commitSha, (counts.get(c.commitSha) ?? 0) + 1)
+    }
+    return counts
   }, [comments])
 
   const handleFileClick = useCallback((filePath: string) => {
@@ -247,6 +266,7 @@ export function App() {
           repoCommits={repoCommits}
           selected={selectedCommit}
           onSelect={setSelectedCommit}
+          commentCounts={commitCommentCounts}
         />
       )}
       <FileTree
