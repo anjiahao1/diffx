@@ -6,9 +6,48 @@ A local code review tool designed for the coding agent workflow. Review AI-gener
 
 ## Install
 
+> The npm package `diffx-cli` is the upstream release. This fork is not
+> published to npm — install it by cloning the repository.
+
+### Manual install (CLI)
+
 ```bash
-npm install -g diffx-cli
+git clone https://github.com/anjiahao1/diffx.git
+cd diffx
+corepack pnpm install
+corepack pnpm run build
+npm install -g .
 ```
+
+Verify with `diffx --version`. Not using corepack? Use `npx pnpm` in place of
+`corepack pnpm`, or install pnpm first (`npm install -g pnpm`).
+
+### Installing for your AI agent
+
+Give your coding agent these steps and it sets diffx up by itself:
+
+1. **Install the CLI** (skip when `which diffx` already succeeds):
+
+   ```bash
+   git clone https://github.com/anjiahao1/diffx.git "$HOME/.diffx/src"
+   cd "$HOME/.diffx/src"
+   corepack pnpm install && corepack pnpm run build
+   npm install -g .
+   ```
+
+2. **Install the skills** (`/diffx-start-review`, `/diffx-finish-review`), e.g.
+   for Claude Code:
+
+   ```bash
+   mkdir -p "$HOME/.claude/skills"
+   ln -sfn "$HOME/.diffx/src/skills/diffx-start-review" "$HOME/.claude/skills/diffx-start-review"
+   ln -sfn "$HOME/.diffx/src/skills/diffx-finish-review" "$HOME/.claude/skills/diffx-finish-review"
+   ```
+
+   (If you use the skills CLI instead: `npx skills add anjiahao1/diffx`.)
+
+3. **Verify**: `diffx --version` prints a version, and the
+   `/diffx-start-review` slash command is available in your agent.
 
 ## Usage
 
