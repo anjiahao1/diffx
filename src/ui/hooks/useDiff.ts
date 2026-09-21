@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 export interface BinaryFileInfo {
   path: string
@@ -38,6 +38,10 @@ export function useDiff(options: DiffOptions, view?: DiffView) {
   const [data, setData] = useState<DiffData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // Which view the current `data` answers (the request in flight when it was
+  // set). During a view switch the previous response stays rendered (no white
+  // flash) but is stale: consumers can tell via `viewMismatch`.
+  const dataViewRef = useRef<DiffView | undefined>(undefined)
 
   useEffect(() => {
     setLoading(true)
@@ -55,7 +59,10 @@ export function useDiff(options: DiffOptions, view?: DiffView) {
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         return res.json()
       })
-      .then((json) => setData(json))
+      .then((json) => {
+        dataViewRef.current = view
+        setData(json)
+      })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false))
   }, [options.staged, options.untracked, view?.commit, view?.repo])
@@ -70,6 +77,11 @@ export function useDiff(options: DiffOptions, view?: DiffView) {
     untrackedFiles: data?.untrackedFiles ?? [],
     repos: data?.repos,
     commitMessage: data?.commitMessage ?? null,
+    // True while `data` answers a different view than the current one (a
+    // view switch is in flight); commit-scoped data must not be used then.
+    viewMismatch:
+      !!view &&
+      (dataViewRef.current?.commit !== view.commit || dataViewRef.current?.repo !== view.repo),
     loading,
     error,
   }

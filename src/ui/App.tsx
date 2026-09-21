@@ -43,7 +43,7 @@ export function App() {
   const view: DiffView | undefined = selectedCommit
     ? { commit: selectedCommit.sha, repo: selectedCommit.repo }
     : undefined
-  const { patch, repoName, branch, customMode, binaryFiles, tabSizeMap, untrackedFiles, repos, commitMessage, loading, error } = useDiff(
+  const { patch, repoName, branch, customMode, binaryFiles, tabSizeMap, untrackedFiles, repos, commitMessage, viewMismatch, loading, error } = useDiff(
     {
       staged: settings.staged,
       untracked: settings.untracked,
@@ -89,6 +89,11 @@ export function App() {
 
   const untrackedSet = useMemo(() => new Set(untrackedFiles), [untrackedFiles])
 
+  // The commit message may come from a stale response while a view switch is
+  // in flight (the previous diff stays rendered to avoid a white flash); only
+  // show it when it belongs to the currently viewed commit.
+  const currentCommitMessage = viewMismatch ? null : commitMessage
+
   const files = useMemo(() => {
     if (!patch) return []
     try {
@@ -97,8 +102,8 @@ export function App() {
 
       // Per-commit view: the commit message leads the diff as an added
       // "file" (COMMIT_MESSAGE), so its lines are commentable like any file.
-      if (selectedCommit && commitMessage) {
-        const msgFile = buildCommitMessageFile(commitMessage)
+      if (selectedCommit && currentCommitMessage) {
+        const msgFile = buildCommitMessageFile(currentCommitMessage)
         if (msgFile) parsedFiles.unshift(msgFile)
       }
 
@@ -123,7 +128,7 @@ export function App() {
     } catch {
       return []
     }
-  }, [patch, binaryFiles, selectedCommit, commitMessage])
+  }, [patch, binaryFiles, selectedCommit, currentCommitMessage])
 
   const fullFiles = useFullDiffs(patch, files, { staged: settings.staged, untracked: settings.untracked, view })
   const displayFiles = useMemo(() => {
