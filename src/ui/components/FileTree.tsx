@@ -16,6 +16,7 @@ import {
   PanelLeftOpen,
 } from 'lucide-react'
 import type { FileDiffMetadata } from '@pierre/diffs'
+import { COMMIT_MESSAGE } from '../utils'
 
 interface FileTreeProps {
   files: FileDiffMetadata[]
@@ -60,6 +61,9 @@ function buildTree(files: FileDiffMetadata[]): TreeNode[] {
 
   function sortNodes(nodes: TreeNode[]) {
     nodes.sort((a, b) => {
+      // The commit-message file leads the tree.
+      if (a.name === COMMIT_MESSAGE) return -1
+      if (b.name === COMMIT_MESSAGE) return 1
       if (a.isDir !== b.isDir) return a.isDir ? -1 : 1
       return a.name.localeCompare(b.name)
     })

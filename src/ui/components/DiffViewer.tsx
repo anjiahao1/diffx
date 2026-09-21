@@ -4,6 +4,7 @@ import type { ReviewComment } from '../../types'
 import type { BinaryFileInfo } from '../hooks/useDiff'
 import { FileDiffCard } from './FileDiffCard'
 import { BinaryFileDiff } from './BinaryFileDiff'
+import { COMMIT_MESSAGE } from '../utils'
 
 interface DiffViewerProps {
   files: FileDiffMetadata[]
@@ -40,6 +41,9 @@ export const DiffViewer = memo(function DiffViewer({
 }: DiffViewerProps) {
   const sortedFiles = useMemo(() => {
     return [...files].sort((a, b) => {
+      // The commit-message file leads the diff.
+      if (a.name === COMMIT_MESSAGE) return -1
+      if (b.name === COMMIT_MESSAGE) return 1
       const partsA = a.name.split('/')
       const partsB = b.name.split('/')
       const len = Math.min(partsA.length, partsB.length)
