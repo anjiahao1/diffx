@@ -148,6 +148,8 @@ if [ "${DRY_RUN:-0}" = "1" ]; then
  10. -- HEAD~1: 200 + repoB last commit content present
  11. single-repo (inside repoA): no prefix, repoName=repoA, branch non-empty,
      /api/commits repo:'' with repoA unpushed commit
+ 12. single-repo custom args (-- HEAD~1): ?commit=<sha> serves that commit's
+     patch + commitMessage, excludes worktree changes
 EOF
   echo "SERVER NOT STARTED BY THIS DRY-RUN"
   exit 0
@@ -387,6 +389,28 @@ else fail_test "branch non-empty" "branch name" "empty"; fi
 req "/api/commits"
 expect_contains "commits repo field empty" "$BODY" '"repo":""'
 expect_contains "repoA unpushed commit listed" "$BODY" 'repoA unpushed edit file1'
+
+# ===========================================================================
+echo "== 12. single-repo custom args: commit view must honor ?commit =="
+kill "$SERVER_PID" 2>/dev/null || true; wait "$SERVER_PID" 2>/dev/null || true; SERVER_PID=
+start_server "$FIXTURE/repoA" -- HEAD~1
+req "/api/diff"
+expect_status "GET /api/diff (custom aggregate)" 200
+expect_contains "aggregate includes worktree rename" "$BODY" 'renamed2.txt'
+req "/api/commits"
+COMMIT_SHA=$(printf '%s' "$BODY" | grep -o '"sha":"[0-9a-f]\{40\}"' | head -1 | sed 's/"sha":"//;s/"//' || true)
+if [ -n "$COMMIT_SHA" ]; then ok "extracted unpushed sha"
+else fail_test "extracted unpushed sha" "40-hex sha" "empty"; fi
+req "/api/diff?commit=$COMMIT_SHA"
+expect_status "GET /api/diff?commit (custom mode)" 200
+expect_contains "commit view has that commit's content" "$BODY" 'edited1'
+expect_contains "commit view has commit message" "$BODY" '"commitMessage":"repoA unpushed edit file1"'
+expect_absent   "commit view excludes worktree rename" "$BODY" 'renamed2.txt'
+if [ "$(printf '%s' "$BODY" | grep -oF 'diff --git' | wc -l)" = "1" ]; then
+  ok "commit view is a single-file patch"
+else
+  fail_test "commit view is a single-file patch" "1 diff --git" "$(printf '%s' "$BODY" | grep -oF 'diff --git' | wc -l) diff --git"
+fi
 
 # ===========================================================================
 echo

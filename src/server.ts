@@ -269,11 +269,15 @@ export function createApp(clientDir: string, customDiffArgs?: string[], commentS
       untrackedFiles = [...untrackedSet]
     } else {
       const untrackedList = untracked ? await getUntrackedFilePaths() : undefined
-      if (isCustomMode) {
-        patch = await getCustomGitDiff(customDiffArgs)
-      } else if (commit) {
+      // Commit drill-down wins over custom args: the sidebar commit list
+      // targets one commit, and a single commit's patch is independent of the
+      // custom range that scoped the review (same precedence as getRepoPatch
+      // in workspace mode).
+      if (commit) {
         patch = await getCommitPatch(commit)
         commitMessage = await getCommitMessage(commit)
+      } else if (isCustomMode) {
+        patch = await getCustomGitDiff(customDiffArgs)
       } else {
         patch = await getGitDiff({ staged, untracked, untrackedList })
       }
@@ -349,7 +353,7 @@ export function createApp(clientDir: string, customDiffArgs?: string[], commentS
       lookupPath = hit.filePath
       patch = await getRepoPatch({ customDiffArgs, untracked, commit: commit && hit.repo === repoQuery ? commit : undefined }, repoAbs)
     } else {
-      patch = isCustomMode ? await getCustomGitDiff(customDiffArgs) : commit ? await getCommitPatch(commit) : await getGitDiff({ staged, untracked })
+      patch = commit ? await getCommitPatch(commit) : isCustomMode ? await getCustomGitDiff(customDiffArgs) : await getGitDiff({ staged, untracked })
     }
     if (!diffContainsFileVersion(patch, lookupPath, oldOid, newOid)) {
       return c.json({ error: 'File version not in current diff' }, 404)
