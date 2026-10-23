@@ -20,6 +20,9 @@ import { COMMIT_MESSAGE, buildCommitMessageFile } from './utils'
 import { CommentTracker } from './components/CommentTracker'
 import { AiNote } from './components/AiNote'
 import { ReviewDoneButton } from './components/ReviewDoneButton'
+import { SearchPanel } from './components/SearchPanel'
+import { revealSearchHit } from './search'
+import type { SearchHit } from './search'
 import { SidebarStorage } from './sidebarStorage'
 
 function useWindowSize({ factor }: { factor: number }) {
@@ -213,6 +216,17 @@ export function App() {
     setViewed(filePath, viewed)
   }, [setViewed])
 
+  // Search jumps to a line that may be inside a file marked Viewed (which
+  // renders only its header). Un-view it so the diff mounts, then walk the
+  // virtualizer until the target row renders.
+  const handleSearchJump = useCallback(
+    (hit: SearchHit) => {
+      if (viewedFiles.has(hit.filePath)) setViewed(hit.filePath, false)
+      revealSearchHit(hit)
+    },
+    [viewedFiles, setViewed],
+  )
+
   // Scroll to a comment's position in the main view. The comment bubble only
   // exists once its file's diff is rendered (virtualized — it may not be
   // mounted at all), so retry for a few seconds and fall back to the file
@@ -378,6 +392,7 @@ export function App() {
           </Virtualizer>
         </main>
       </div>
+      <SearchPanel files={displayFiles} onJump={handleSearchJump} />
     </div>
   )
 }

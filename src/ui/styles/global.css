@@ -1347,3 +1347,142 @@ body {
 .comment-reply-input textarea:focus {
     border-color: var(--accent, #58a6ff);
 }
+
+/* In-app diff search */
+
+.search-panel {
+    position: fixed;
+    top: 56px;
+    right: 24px;
+    z-index: 200;
+    width: min(620px, calc(100vw - 48px));
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+.search-panel-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+}
+
+.search-panel-icon {
+    flex-shrink: 0;
+    color: var(--text-secondary);
+}
+
+.search-panel-input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    font-size: 13px;
+}
+
+.search-panel-count {
+    flex-shrink: 0;
+    font-size: 11px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.search-panel-close {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.search-panel-close:hover {
+    background: var(--bg);
+    color: var(--text);
+}
+
+.search-results {
+    max-height: 45vh;
+    overflow-y: auto;
+}
+
+.search-result {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    width: 100%;
+    padding: 4px 10px;
+    border: 0;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.search-result:hover,
+.search-result-active {
+    background: var(--bg-secondary);
+}
+
+.search-result-loc {
+    flex-shrink: 0;
+    max-width: 45%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.search-result-side {
+    flex-shrink: 0;
+    width: 10px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.search-result-side.additions {
+    color: var(--success);
+}
+
+.search-result-side.deletions {
+    color: var(--danger);
+}
+
+.search-result-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: pre;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12px;
+}
+
+.search-result-text mark {
+    background: var(--comment-bg);
+    color: inherit;
+    border-radius: 2px;
+}
+
+.search-empty {
+    padding: 12px;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
